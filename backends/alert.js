@@ -2,7 +2,7 @@
 
 var util = require('util');
 var mysql = require('mysql');
-var pool = mysql.createPool({
+var connection = mysql.createConnection({
     host: 'localhost',
     user: 'root',
     password: '',
@@ -48,34 +48,29 @@ function clone(p) {
 }
 
 function putIntoStorage(fields) {
-    pool.getConnection(function(connection) {
-        connection.query('INSERT INTO' + pool.escape(table_name) + 'SET ?', fields, function (error) {
-            connection.release();
+
+        connection.query('INSERT INTO ' + table_name + ' SET ? ', fields, function (error) {
             if (error) {
                 if (error.code === 'ER_NO_SUCH_TABLE') {
                     createTable(table_name, function() {
                         putIntoStorage(fields);
                     });
-                }
-            } else {
+                } else {
                  console.log("Failed to insert data into table" + error );
+                }
             }
       });
-    });
 }
 
 function createTable(table_name, callback) {
-    pool.getConnection(function(connection) {
-        connection.query('CREATE TABLE IF NOT EXISTS ' + pool.escapeId(table_name) + ' like ' + pool.escapeId(TABLE_TEMPLATE), function (error) {
-            connection.release();
-            if(error) {
-                console.log ("Failed to create new table. " + error );
-            } else {
-                console.log("Table has been created: " + table_name );
-                callback();
-            }
-      });
- });
+    connection.query('CREATE TABLE IF NOT EXISTS ' + table_name + ' like ' + TABLE_TEMPLATE, function (error) {
+        if(error) {
+            console.log ("Failed to create new table. " + error );
+        } else {
+            console.log("Table has been created: " + table_name );
+            callback();
+        }
+  });
 }
 
 var time = -1;
@@ -120,21 +115,29 @@ AlertBackend.prototype.flush = function(timestamp, metrics) {
       fields.time = time;
       fields.name = key;
       fields.count = newVal;
-      // 将结果存入mysql
-      putIntoStorage(fields);
+      fields.ratio = 0;
 
       // 应用报警策略
       if (this.lastCounters.hasOwnProperty(key)) {
           oldVal = this.lastCounters[key];
           console.log(key + ' ' + oldVal + ' ' + newVal);
-          if (oldVal !== 0 && (ratio = (newVal-oldVal)/oldVal) > 0.5) {
+          if (oldVal !== 0) {
+              ratio = (newVal-oldVal)/oldVal;
+              fields.ratio = ratio;
+          }
+
+          // 将结果存入mysql
+          putIntoStorage(fields);
+          console.log("put into storage");
+
+          if (oldVal !== 0 && ratio > 5) {
               console.log("alert: " + key);
               mailOptions = {
-              from:"liangfangfang <ee07b577@gmail.com>",
-              to:"liangfangfang <liangfangfang@meituan.com>",
-              subject:key + " alert of fe js error!",
-              text:key + " error increases " + ratio + " in fe www!",
-              html:"<b>" + key + " error increases " + ratio + " in fe www!</b>",
+                  from:"liangfangfang <ee07b577@gmail.com>",
+                  to:"liangfangfang <liangfangfang@meituan.com>",
+                  subject:key + " alert of fe js error!",
+                  text:key + " error increases " + ratio + " in fe www!",
+                  html:"<b>" + key + " error increases " + ratio + " in fe www!</b>",
               }
               transport.sendMail(mailOptions, function(error, response){
                   if (error) {
@@ -145,6 +148,7 @@ AlertBackend.prototype.flush = function(timestamp, metrics) {
               });
           }
       }
+
   }
 };
 
