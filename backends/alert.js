@@ -117,7 +117,6 @@ AlertBackend.prototype.flush = function(timestamp, metrics) {
       fields.time = time;
       fields.name = key;
       fields.count = newVal;
-      fields.ratio = null;
 
       // 应用报警策略
       if (this.lastCounters.hasOwnProperty(key)) {
@@ -127,7 +126,7 @@ AlertBackend.prototype.flush = function(timestamp, metrics) {
       }
       increm = newVal-oldVal;
       fields.increm = increm;
-      fields.ratio = oldVal ? (increm/oldVal) : null;
+      fields.ratio = (oldVal===0) ? null:(increm/oldVal);
 
       // 将结果存入mysql
       putIntoStorage(fields);
