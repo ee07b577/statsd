@@ -85,7 +85,6 @@ AlertBackend.prototype.flush = function(timestamp, metrics) {
   console.log("");
   console.log("");
   console.log("");
-  console.log("");
 
   // 拼出表名
   var year = date.getFullYear();
@@ -104,49 +103,51 @@ AlertBackend.prototype.flush = function(timestamp, metrics) {
   this.lastCounters = clone(this.counters);
   this.counters = clone(metrics.counters);
   // 计算每项错误数量的增长比率并发邮件报警
-  var oldVal, newVal, ratio;
+  var oldVal, newVal, increm;
   for (var key in this.counters) {
       // 如果为statsd 本身统计数据，对定位错误无意义，去掉
       if (key === 'statsd.bad_lines_seen' || key === 'statsd.packets_received') continue;
 
       newVal = this.counters[key];
-      // 拼凑纪录对象，insert 到 mysql 中
+      // 如果该项计数为0，无价值，去掉
+      if (newVal === 0) continue;
+
+      // 拼纪录对象，insert 到 mysql 中
       var fields = {};
       fields.time = time;
       fields.name = key;
       fields.count = newVal;
-      fields.ratio = 0;
+      fields.ratio = null;
 
       // 应用报警策略
       if (this.lastCounters.hasOwnProperty(key)) {
           oldVal = this.lastCounters[key];
-          console.log(key + ' ' + oldVal + ' ' + newVal);
-          if (oldVal !== 0) {
-              ratio = (newVal-oldVal)/oldVal;
-              fields.ratio = ratio;
+      } else {
+          oldVal = 0;
+      }
+      increm = newVal-oldVal;
+      fields.increm = increm;
+      fields.ratio = oldVal ? (increm/oldVal) : null;
+
+      // 将结果存入mysql
+      putIntoStorage(fields);
+      
+      var ratio;
+      if (oldVal !== 0 && (ratio = increm/oldVal) > 5) {
+          mailOptions = {
+              from:"liangfangfang <ee07b577@gmail.com>",
+              to:"liangfangfang <liangfangfang@meituan.com>",
+              subject:key + " alert of fe js error!",
+              text:key + " error increases " + ratio + " in fe www!",
+              html:"<b>" + key + " error increases " + ratio + " in fe www!</b>",
           }
-
-          // 将结果存入mysql
-          putIntoStorage(fields);
-          console.log("put into storage");
-
-          if (oldVal !== 0 && ratio > 5) {
-              console.log("alert: " + key);
-              mailOptions = {
-                  from:"liangfangfang <ee07b577@gmail.com>",
-                  to:"liangfangfang <liangfangfang@meituan.com>",
-                  subject:key + " alert of fe js error!",
-                  text:key + " error increases " + ratio + " in fe www!",
-                  html:"<b>" + key + " error increases " + ratio + " in fe www!</b>",
+          transport.sendMail(mailOptions, function(error, response){
+              if (error) {
+                  console.log(error);
+              } else {
+                  console.log(response);
               }
-              transport.sendMail(mailOptions, function(error, response){
-                  if (error) {
-                      console.log(error);
-                  } else {
-                      console.log(response);
-                  }
-              });
-          }
+          });
       }
 
   }

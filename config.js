@@ -104,6 +104,6 @@ Optional Variables:
 , port: 8125
 , dumpMessages: true    
 , debug: true    
-, flushInterval: 60000
+, flushInterval: 600000
 , backends: [ "./backends/graphite","./backends/alert" ]
 }
