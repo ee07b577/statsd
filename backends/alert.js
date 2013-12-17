@@ -95,11 +95,8 @@ function createTable(table_name, callback) {
     connection.query('CREATE TABLE IF NOT EXISTS ' + table_name + ' like ' + TABLE_TEMPLATE, function (error) {
         if(error) {
             console.log ("Failed to create new table. " + error );
-        } else {
-            console.log("Table has been created: " + table_name );
-            callback();
         }
-  });
+    });
 }
 
 AlertBackend.prototype.flush = function(timestamp, metrics) {
