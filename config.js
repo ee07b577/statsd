@@ -102,8 +102,8 @@ Optional Variables:
   graphitePort: "" 
 , graphiteHost: ""
 , port: 8125
-, dumpMessages: true    
-, debug: true    
-, flushInterval: 600000
+, dumpMessages: false
+, debug: false
+, flushInterval: 240000
 , backends: [ "./backends/graphite","./backends/alert" ]
 }
